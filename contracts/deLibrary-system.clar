@@ -27,3 +27,35 @@
 (define-constant ERROR-ADMIN-ONLY (err u307))        ;; Operation restricted to admin
 (define-constant ERROR-PERMISSION (err u308))        ;; User lacks required permissions
 (define-constant ERROR-ACCESS-FORBIDDEN (err u309))  ;; Access explicitly forbidden
+
+;;-----------------------------------------------------------------------------
+;; Data Storage Structures
+;;-----------------------------------------------------------------------------
+
+;; System publication counter
+(define-data-var publication-count uint u0)
+
+;; Publication metadata storage
+(define-map publication-registry
+    { publication-id: uint }
+    {
+        title: (string-ascii 64),                  ;; Publication title
+        creator: principal,                        ;; Creator's blockchain identity
+        byte-count: uint,                          ;; File size in bytes
+        creation-block: uint,                      ;; Block height at creation time
+        description: (string-ascii 256),           ;; Publication description
+        tags: (list 8 (string-ascii 32))           ;; Classification tags
+    }
+)
+
+;; User permission tracking
+(define-map user-permissions
+    { publication-id: uint, user: principal }
+    { permitted: bool }                            ;; Permission status flag
+)
+
+;; Usage statistics tracking
+(define-map usage-statistics
+    { publication-id: uint }
+    { access-count: uint }                         ;; Number of accesses recorded
+)
