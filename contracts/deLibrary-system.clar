@@ -59,3 +59,21 @@
     { publication-id: uint }
     { access-count: uint }                         ;; Number of accesses recorded
 )
+
+;;-----------------------------------------------------------------------------
+;; Internal Helper Functions
+;;-----------------------------------------------------------------------------
+
+;; Check if publication exists
+(define-private (publication-registered? (publication-id uint))
+    (is-some (map-get? publication-registry { publication-id: publication-id }))
+)
+
+;; Verify publication ownership
+(define-private (is-creator? (publication-id uint) (user principal))
+    (match (map-get? publication-registry { publication-id: publication-id })
+        pub-data (is-eq (get creator pub-data) user)
+        false
+    )
+)
+     
