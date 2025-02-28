@@ -154,3 +154,63 @@
         (ok true)
     )
 )
+
+
+;; Register new publication
+(define-public (register-publication 
+    (title (string-ascii 64)) 
+    (byte-count uint) 
+    (description (string-ascii 256)) 
+    (tags (list 8 (string-ascii 32))))
+    (let
+        ((next-id (+ (var-get publication-count) u1)))
+        
+        ;; Input validation checks
+        (asserts! (and (> (len title) u0) (< (len title) TITLE-MAX-CHARS)) ERROR-INVALID-TITLE)
+        (asserts! (and (> byte-count u0) (< byte-count FILE-SIZE-LIMIT)) ERROR-INVALID-SIZE)
+        (asserts! (and (> (len description) u0) (< (len description) DESCRIPTION-MAX-CHARS)) ERROR-INVALID-TITLE)
+        (asserts! (validate-tag-list? tags) ERROR-INVALID-TITLE)
+
+        ;; Store publication data
+        (map-insert publication-registry
+            { publication-id: next-id }
+            {
+                title: title,
+                creator: tx-sender,
+                byte-count: byte-count,
+                creation-block: block-height,
+                description: description,
+                tags: tags
+            }
+        )
+
+        ;; Grant creator access by default
+        (map-insert user-permissions
+            { publication-id: next-id, user: tx-sender }
+            { permitted: true }
+        )
+
+        ;; Update system counter
+        (var-set publication-count next-id)
+        (ok next-id)
+    )
+)
+
+;; Record publication access
+(define-public (access-publication (publication-id uint))
+    (begin
+        ;; Verify publication exists
+        (asserts! (publication-registered? publication-id) ERROR-ITEM-MISSING)
+
+        ;; Verify user has permission
+        (let
+            ((permission (default-to { permitted: false }
+                            (map-get? user-permissions { publication-id: publication-id, user: tx-sender }))))
+            (asserts! (get permitted permission) ERROR-PERMISSION)
+        )
+
+        ;; Update access statistics
+        (record-access publication-id)
+        (ok true)
+    )
+)
