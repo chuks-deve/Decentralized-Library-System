@@ -77,3 +77,80 @@
     )
 )
      
+;; Get publication size
+(define-private (get-byte-count (publication-id uint))
+    (default-to u0 
+        (get byte-count 
+            (map-get? publication-registry { publication-id: publication-id })
+        )
+    )
+)
+
+;; Validate tag format
+(define-private (valid-tag? (tag (string-ascii 32)))
+    (and 
+        (> (len tag) u0)
+        (< (len tag) TAG-MAX-CHARS)
+    )
+)
+
+;; Validate all tags in list
+(define-private (validate-tag-list? (tags (list 8 (string-ascii 32))))
+    (and
+        (> (len tags) u0)
+        (<= (len tags) MAX-TAG-COUNT)
+        (is-eq (len (filter valid-tag? tags)) (len tags))
+    )
+)
+
+;; Update usage counter
+(define-private (record-access (publication-id uint))
+    (let
+        (
+            (current-accesses (default-to u0 (get access-count (map-get? usage-statistics { publication-id: publication-id }))))
+        )
+        (map-set usage-statistics
+            { publication-id: publication-id }
+            { access-count: (+ current-accesses u1) }
+        )
+    )
+)
+
+;;-----------------------------------------------------------------------------
+;; Public Interface
+;;-----------------------------------------------------------------------------
+
+;; Retrieve complete publication details
+(define-read-only (get-publication-details (publication-id uint))
+    (match (map-get? publication-registry { publication-id: publication-id })
+        pub-data 
+        (ok {
+            title: (get title pub-data),
+            creator: (get creator pub-data),
+            byte-count: (get byte-count pub-data),
+            creation-block: (get creation-block pub-data),
+            description: (get description pub-data),
+            tags: (get tags pub-data),
+            access-count: (default-to u0 (get access-count (map-get? usage-statistics { publication-id: publication-id })))
+        })
+        ERROR-ITEM-MISSING
+    )
+)
+
+;; Change publication ownership
+(define-public (change-creator (publication-id uint) (new-creator principal))
+    (let
+        ((pub-data (unwrap! (map-get? publication-registry { publication-id: publication-id }) ERROR-ITEM-MISSING)))
+        
+        ;; Security validations
+        (asserts! (publication-registered? publication-id) ERROR-ITEM-MISSING)
+        (asserts! (is-eq (get creator pub-data) tx-sender) ERROR-UNAUTHORIZED)
+
+        ;; Update creator field
+        (map-set publication-registry
+            { publication-id: publication-id }
+            (merge pub-data { creator: new-creator })
+        )
+        (ok true)
+    )
+)
