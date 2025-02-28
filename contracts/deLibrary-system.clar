@@ -214,3 +214,52 @@
         (ok true)
     )
 )
+
+;; Modify publication details
+(define-public (modify-publication 
+    (publication-id uint) 
+    (updated-title (string-ascii 64)) 
+    (updated-size uint) 
+    (updated-description (string-ascii 256)) 
+    (updated-tags (list 8 (string-ascii 32))))
+    (let
+        ((pub-data (unwrap! (map-get? publication-registry { publication-id: publication-id }) ERROR-ITEM-MISSING)))
+        
+        ;; Validate existing record and permissions
+        (asserts! (publication-registered? publication-id) ERROR-ITEM-MISSING)
+        (asserts! (is-eq (get creator pub-data) tx-sender) ERROR-UNAUTHORIZED)
+        
+        ;; Validate new data
+        (asserts! (and (> (len updated-title) u0) (< (len updated-title) TITLE-MAX-CHARS)) ERROR-INVALID-TITLE)
+        (asserts! (and (> updated-size u0) (< updated-size FILE-SIZE-LIMIT)) ERROR-INVALID-SIZE)
+        (asserts! (and (> (len updated-description) u0) (< (len updated-description) DESCRIPTION-MAX-CHARS)) ERROR-INVALID-TITLE)
+        (asserts! (validate-tag-list? updated-tags) ERROR-INVALID-TITLE)
+
+        ;; Update publication record
+        (map-set publication-registry
+            { publication-id: publication-id }
+            (merge pub-data { 
+                title: updated-title, 
+                byte-count: updated-size, 
+                description: updated-description, 
+                tags: updated-tags 
+            })
+        )
+        (ok true)
+    )
+)
+
+;; Remove publication from system
+(define-public (remove-publication (publication-id uint))
+    (let
+        ((pub-data (unwrap! (map-get? publication-registry { publication-id: publication-id }) ERROR-ITEM-MISSING)))
+        
+        ;; Verify record exists and user has permission
+        (asserts! (publication-registered? publication-id) ERROR-ITEM-MISSING)
+        (asserts! (is-eq (get creator pub-data) tx-sender) ERROR-UNAUTHORIZED)
+
+        ;; Delete publication record
+        (map-delete publication-registry { publication-id: publication-id })
+        (ok true)
+    )
+)
